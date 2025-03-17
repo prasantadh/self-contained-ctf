@@ -1,0 +1,31 @@
+- hosts: all
+  become: true
+  become_method: sudo
+  tasks:
+  - name: Apt Update
+    ansible.builtin.apt:
+      update_cache: true
+      autoremove: true
+
+  - name: Install packages x11vnc and novnc
+    ansible.builtin.apt:
+      pkg:
+        - x11vnc
+        - novnc
+        - xvfb
+
+  # using https://unix.stackexchange.com/questions/10465/how-do-i-start-xvfb-on-startup-on-debian
+          # rc.local, it seems we can start a virtual frame buffer on startup
+    # maybe even startxfce and x11vnc
+    # the issue then becomes how do we keep the novnc_proxy running
+    # systemctl enable rc-local to run immediately
+  - name: Start a XVNC Server
+    ansible.builtin.shell: |
+        nohup Xvfb :1 -screen 1 1600x1200x16 &
+        DISPLAY=:1 startxfce4 &
+        x11vnc -display :1 -autoport -nopw -bg -xkb -ncache -ncache_cr -quiet -forever
+        nohup /usr/share/novnc/utils/novnc_proxy --listen 8080 &
+    args:
+      executable: /bin/bash
+
+
