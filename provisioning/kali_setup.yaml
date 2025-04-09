@@ -1,31 +1,45 @@
 - hosts: all
   become: true
   become_method: sudo
+  vars:
+    number_of_sessions: "{{ number_of_sessions | default(1) }}"
   tasks:
   - name: Apt Update
     ansible.builtin.apt:
       update_cache: true
       autoremove: true
 
-  - name: Install packages x11vnc and novnc
+  - name: Install required packages
     ansible.builtin.apt:
       pkg:
-        - x11vnc
         - novnc
-        - xvfb
+        - tigervnc-standalone-server
+        - websockify
+        - nginx
 
-  # using https://unix.stackexchange.com/questions/10465/how-do-i-start-xvfb-on-startup-on-debian
-          # rc.local, it seems we can start a virtual frame buffer on startup
-    # maybe even startxfce and x11vnc
-    # the issue then becomes how do we keep the novnc_proxy running
-    # systemctl enable rc-local to run immediately
+  - name: Create .vnc directory 
+    file: 
+      state: directory
+      path: /home/vagrant/.vnc
+      owner: vagrant
+      group: vagrant
+
+  - name: Create tigervnc configuration file
+    copy:
+      dest: "/home/vagrant/.vnc/xstartup"
+      src: "./xstartup"
+      owner: vagrant
+      group: vagrant
+      mode: 0755
+  
   - name: Start a XVNC Server
     ansible.builtin.shell: |
-        nohup Xvfb :1 -screen 1 1600x1200x16 &
-        DISPLAY=:1 startxfce4 &
-        x11vnc -display :1 -autoport -nopw -bg -xkb -ncache -ncache_cr -quiet -forever
-        nohup /usr/share/novnc/utils/novnc_proxy --listen 8080 &
+      for i in $(seq 1 {{ number_of_sessions }} ); do
+        vncserver -SecurityTypes none -xstartup /home/vagrant/.vnc/xstartup
+        websockify -D --web /usr/share/novnc/ $((8000+i)) localhost:$((5900+i))
+      done;
     args:
       executable: /bin/bash
-
-
+    
+  # Might be cool to have this run my dotfiles
+  # Another option is to have vncserver run as vagrant user instead of root
