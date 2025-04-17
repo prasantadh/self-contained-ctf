@@ -10,6 +10,19 @@ The system will also bring up `NUMBER_OF_TEAMS` ubuntu machine with
 IP `192.168.56.{200 + team}`. The default `NUMBER_OF_TEAMS` is 1
 so the ubuntu machine is available over at `192.168.56.201`
 
+## Installation
+
+1. Install [Vagrant](https://developer.hashicorp.com/vagrant/downloads)
+2. Install VirtualBox:
+  ```bash
+  sudo apt update
+  sudo apt install virtualbox virtualbox-ext-pack
+  ```
+3. Install Ansible:
+  ```bash
+  pipx install --include-deps ansible
+  ```
+
 ## Troubleshooting
 
 ```bash
