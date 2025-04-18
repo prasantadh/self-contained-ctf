@@ -1,0 +1,76 @@
+# Vagrant file to get a kali machine up along with some ubuntu machines 
+# Kali NUMBER_OF_SESSIONS VNC sessions available over PORT 8001 onwards 
+# NUMBER_OF_TEAMS kali machines are spawned
+Vagrant.configure(2) do |config| 
+
+  number_of_teams = ENV.fetch("NUMBER_OF_TEAMS", 1).to_i
+  number_of_sessions = ENV.fetch("NUMBER_OF_SESSIONS", 1).to_i
+
+  # Spin up the Kali Virtual Machines with ansible to start the VNC sessions
+  (1..number_of_teams).each do |kali_idx|
+    config.vm.define "kali-#{kali_idx}" do |kali|
+      kali.vm.box = "kalilinux/rolling"
+
+      # Each VM gets its own private network with the same IP address
+      kali.vm.network "private_network", ip: "10.10.0.10", virtualbox__intnet: "intnet-#{kali_idx}"
+      kali.vm.network "forwarded_port", guest: 8001, host: 8000 + kali_idx
+
+      kali.vm.provider "virtualbox" do |vb|
+        vb.memory = "2048"
+        vb.gui = false
+        vb.cpus = 1
+      end
+
+      kali.vm.provision :ansible do |ansible|
+        ansible.playbook = "../../provisioning/restart_network.yaml"
+      end
+      kali.vm.provision :ansible do |ansible| 
+        ansible.playbook = "../../provisioning/kali_setup.yaml"
+        ansible.extra_vars = {
+          number_of_sessions: number_of_sessions
+        }
+      end
+      kali.vm.provision :ansible do |ansible|
+        ansible.playbook = "setup_routes.yaml"
+      end
+    end
+
+    # Add a FinalServer VM for each kali VM
+    config.vm.define "final-server-#{kali_idx}" do |final_server|
+      final_server.vm.box = "6573FinalServer"
+      final_server.vm.box_url = "https://resources.corbanvilla.com/public/vms/6573FinalServer.box"
+
+      final_server.vm.provider "virtualbox" do |vb|
+        vb.memory = "1024"
+        vb.cpus = 1
+        vb.gui = false
+      end
+
+      final_server.vm.communicator = "none"
+
+      # Remove default NAT adapter by overriding networks
+      # final_server.vm.networks.clear if final_server.vm.respond_to?(:networks)
+
+      final_server.vm.network "private_network", ip: "10.10.0.66", virtualbox__intnet: "intnet-#{kali_idx}", adapter: 1
+      final_server.vm.network "private_network", ip: "172.16.1.1", virtualbox__intnet: "intnet-company-#{kali_idx}", adapter: 2
+    end
+
+    # Add a FinalClient VM for each kali VM
+    config.vm.define "final-client-#{kali_idx}" do |final_client|
+      final_client.vm.box = "6573FinalClient"
+      final_client.vm.box_url = "https://resources.corbanvilla.com/public/vms/6573FinalClient.box"
+
+      final_client.vm.provider "virtualbox" do |vb|
+        vb.memory = "1024"
+        vb.cpus = 1
+        vb.gui = false
+      end
+
+      final_client.vm.communicator = "none"
+
+      # Attach only to the intnet-company-#{kali_idx} network with specified IP
+      final_client.vm.network "private_network", ip: "172.16.1.2", virtualbox__intnet: "intnet-company-#{kali_idx}", adapter: 1
+    end
+  end
+
+end
