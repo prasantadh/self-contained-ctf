@@ -1,0 +1,14 @@
+- name: restart networking and wait for SSH
+  hosts: all
+  become: yes
+  tasks:
+    - name: Asynchronously restart the networking service
+      ansible.builtin.systemd:
+        name: networking
+        state: restarted
+      async: 60
+      poll: 0
+    - name: Wait for SSH to come back
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 300
