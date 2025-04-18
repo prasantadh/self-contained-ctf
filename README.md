@@ -23,7 +23,7 @@ so the ubuntu machine is available over at `192.168.56.201`
   sudo apt install -y pipx
   pipx install --include-deps ansible
   ```
-4. Install `vagrant-none-communicator`:
+4. Install [`vagrant-none-communicator`](https://github.com/soapy1/vagrant-none-communicator):
   ```bash
   vagrant plugin install vagrant-none-communicator
   ```
