@@ -16,12 +16,36 @@ so the ubuntu machine is available over at `192.168.56.201`
 2. Install VirtualBox:
   ```bash
   sudo apt update
-  sudo apt install virtualbox virtualbox-ext-pack
+  sudo apt install -y virtualbox virtualbox-ext-pack
   ```
 3. Install Ansible:
   ```bash
+  sudo apt install -y pipx
   pipx install --include-deps ansible
   ```
+4. Install `vagrant-none-communicator`:
+  ```bash
+  vagrant plugin install vagrant-none-communicator
+  ```
+
+## Startup
+
+```bash
+vagrant up --no-provision
+vagrant provision
+```
+
+## Shutdown
+
+```bash
+vagrant halt
+```
+
+## Delete
+
+```bash
+vagrant destroy -f
+```
 
 ## Troubleshooting
 
