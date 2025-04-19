@@ -32,7 +32,19 @@
       group: vagrant
       mode: 0755
   
+  - name: Kill existing VNC servers (if any)
+    become: true
+    become_user: vagrant
+    ansible.builtin.shell: |
+      vncserver -kill :*
+      pkill -f websockify
+    args:
+      executable: /bin/bash
+    ignore_errors: true
+
   - name: Start a XVNC Server
+    become: true
+    become_user: vagrant
     ansible.builtin.shell: |
       for i in $(seq 1 {{ number_of_sessions }} ); do
         vncserver -SecurityTypes none -xstartup /home/vagrant/.vnc/xstartup
@@ -40,6 +52,13 @@
       done;
     args:
       executable: /bin/bash
+
+  - name: Symlink vnc.html to index.html for noVNC
+    ansible.builtin.file:
+      src: /usr/share/novnc/vnc.html
+      dest: /usr/share/novnc/index.html
+      state: link
+      force: true
+    ignore_errors: true
     
   # Might be cool to have this run my dotfiles
-  # Another option is to have vncserver run as vagrant user instead of root
