@@ -5,3 +5,6 @@
     - name: Add route for CS6573
       ansible.builtin.command: ip route add 172.16.1.0/24 via 10.10.0.66
       ignore_errors: yes  # In case the route already exists
+
+    - name: Curl http://10.10.0.66 to test connectivity
+      ansible.builtin.command: curl -s http://10.10.0.66
