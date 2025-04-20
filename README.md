@@ -31,8 +31,7 @@ so the ubuntu machine is available over at `192.168.56.201`
 ## Startup
 
 ```bash
-vagrant up --no-provision
-vagrant provision
+vagrant up --no-provision && vagrant reload --no-provision && vagrant provision
 ```
 
 ## Shutdown
