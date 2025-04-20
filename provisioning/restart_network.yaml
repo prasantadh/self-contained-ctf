@@ -2,13 +2,27 @@
   hosts: all
   become: yes
   tasks:
+    - name: Check if networking has already been restarted
+      ansible.builtin.stat:
+        path: /var/tmp/network_restarted_once
+      register: network_restart_flag
+
     - name: Asynchronously restart the networking service
       ansible.builtin.systemd:
         name: networking
         state: restarted
       async: 60
       poll: 0
+      when: not network_restart_flag.stat.exists
+
     - name: Wait for SSH to come back
       ansible.builtin.wait_for_connection:
         delay: 5
         timeout: 300
+      when: not network_restart_flag.stat.exists
+
+    - name: Create marker file to indicate networking has been restarted
+      ansible.builtin.file:
+        path: /var/tmp/network_restarted_once
+        state: touch
+      when: not network_restart_flag.stat.exists
