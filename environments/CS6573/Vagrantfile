@@ -3,8 +3,8 @@
 # NUMBER_OF_TEAMS kali machines are spawned
 Vagrant.configure(2) do |config| 
 
-  number_of_teams = ENV.fetch("NUMBER_OF_TEAMS", 1).to_i
-  number_of_sessions = ENV.fetch("NUMBER_OF_SESSIONS", 1).to_i
+  number_of_teams = ENV.fetch("NUMBER_OF_TEAMS", 4).to_i
+  number_of_sessions = ENV.fetch("NUMBER_OF_SESSIONS", 4).to_i
 
   # Spin up the Kali Virtual Machines with ansible to start the VNC sessions
   (1..number_of_teams).each do |kali_idx|
@@ -13,12 +13,20 @@ Vagrant.configure(2) do |config|
 
       # Each VM gets its own private network with the same IP address
       kali.vm.network "private_network", ip: "10.10.0.10", virtualbox__intnet: "intnet-#{kali_idx}"
-      kali.vm.network "forwarded_port", guest: 8001, host: 8000 + kali_idx
+
+      # Forward a block of ports for VNC sessions
+      session_base_port = 8001 + (kali_idx - 1) * number_of_sessions
+      (0...number_of_sessions).each do |session_offset|
+        host_port = session_base_port + session_offset
+        guest_port = 8001 + session_offset
+        kali.vm.network "forwarded_port", guest: guest_port, host: host_port
+      end
 
       kali.vm.provider "virtualbox" do |vb|
-        vb.memory = "2048"
+        vb.memory = "16384"
         vb.gui = false
         vb.cpus = 1
+        vb.linked_clone = true
       end
 
       kali.vm.provision :ansible do |ansible|
@@ -44,6 +52,7 @@ Vagrant.configure(2) do |config|
         vb.memory = "1024"
         vb.cpus = 1
         vb.gui = false
+        vb.linked_clone = true
       end
 
       final_server.vm.communicator = "none"
@@ -64,6 +73,7 @@ Vagrant.configure(2) do |config|
         vb.memory = "1024"
         vb.cpus = 1
         vb.gui = false
+        vb.linked_clone = true
       end
 
       final_client.vm.communicator = "none"
