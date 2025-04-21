@@ -16,42 +16,110 @@
         - tigervnc-standalone-server
         - websockify
         - nginx
+        - whois
 
-  - name: Create .vnc directory 
-    file: 
+  - name: Check if user home directory exists
+    ansible.builtin.stat:
+      path: "/home/user{{ item }}"
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+    register: user_home_stat
+
+  - name: Create users user1, user2, ..., userN
+    ansible.builtin.user:
+      name: "user{{ item }}"
+      shell: /bin/bash
+      state: present
+      groups: sudo
+      append: yes
+      create_home: yes
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+    ignore_errors: true
+    when: not (user_home_stat.results | selectattr('item', 'equalto', item) | first).stat.exists
+
+  - name: Copy /home/vagrant to new user home directories
+    ansible.builtin.copy:
+      src: /home/vagrant/
+      dest: "/home/user{{ item }}/"
+      owner: "user{{ item }}"
+      group: "user{{ item }}"
+      mode: preserve
+      remote_src: yes
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+    ignore_errors: true
+    when: not (user_home_stat.results | selectattr('item', 'equalto', item) | first).stat.exists
+
+  - name: Ensure ownership of new user home directories
+    ansible.builtin.file:
+      path: "/home/user{{ item }}"
+      owner: "user{{ item }}"
+      group: "user{{ item }}"
+      recurse: yes
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+    ignore_errors: true
+    when: not (user_home_stat.results | selectattr('item', 'equalto', item) | first).stat.exists
+
+  - name: Allow passwordless sudo for each user
+    ansible.builtin.copy:
+      dest: "/etc/sudoers.d/user{{ item }}"
+      content: "user{{ item }} ALL=(ALL) NOPASSWD:ALL\n"
+      owner: root
+      group: root
+      mode: '0440'
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+
+  - name: Set password for each user using shell command
+    ansible.builtin.shell: |
+      echo "user{{ item }}:$(mkpasswd --method=SHA-512 --rounds=5000 --salt=ansible user{{ item }})" | chpasswd -e
+    args:
+      executable: /bin/bash
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+    ignore_errors: true
+
+  - name: Create .vnc directory for each user
+    ansible.builtin.file:
       state: directory
-      path: /home/vagrant/.vnc
-      owner: vagrant
-      group: vagrant
+      path: "/home/user{{ item }}/.vnc"
+      owner: "user{{ item }}"
+      group: "user{{ item }}"
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
 
-  - name: Create tigervnc configuration file
-    copy:
-      dest: "/home/vagrant/.vnc/xstartup"
+  - name: Create .config/tigervnc directory for each user
+    ansible.builtin.file:
+      state: directory
+      path: "/home/user{{ item }}/.config/tigervnc"
+      owner: "user{{ item }}"
+      group: "user{{ item }}"
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+
+  - name: Copy tigervnc configuration file for each user
+    ansible.builtin.copy:
+      dest: "/home/user{{ item }}/.vnc/xstartup"
       src: "./xstartup"
-      owner: vagrant
-      group: vagrant
+      owner: "user{{ item }}"
+      group: "user{{ item }}"
       mode: 0755
-  
-  - name: Kill existing VNC servers (if any)
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
+
+  - name: Kill existing VNC servers (if any) for each user
     become: true
-    become_user: vagrant
+    become_user: "user{{ item }}"
     ansible.builtin.shell: |
       vncserver -kill :*
       pkill -f websockify
     args:
       executable: /bin/bash
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
     ignore_errors: true
 
-  - name: Start a XVNC Server
+  - name: Start a XVNC Server and websockify for each user
     become: true
-    become_user: vagrant
+    become_user: "user{{ item }}"
     ansible.builtin.shell: |
-      for i in $(seq 1 {{ number_of_sessions }} ); do
-        vncserver -SecurityTypes none -xstartup /home/vagrant/.vnc/xstartup
-        websockify -D --web /usr/share/novnc/ $((8000+i)) localhost:$((5900+i))
-      done;
+      vncserver -SecurityTypes none -xstartup /home/user{{ item }}/.vnc/xstartup :{{ item }}
+      websockify -D --web /usr/share/novnc/ $((8000+{{ item }})) localhost:$((5900+{{ item }}))
     args:
       executable: /bin/bash
+    loop: "{{ range(1, number_of_sessions + 1) | list }}"
 
   - name: Symlink vnc.html to index.html for noVNC
     ansible.builtin.file:
